@@ -22,6 +22,8 @@ inline void RestoreSOToleranceState() {}
 #include <metahost.h>
 #include <new>
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
 
 #if !defined(FEATURE_PAL)
 #include <dia2.h>
@@ -1785,7 +1787,6 @@ inline BOOL SafeReadMemory (CLRDATA_ADDRESS offset, PVOID lpBuffer, ULONG cb, PU
 BOOL NameForMD_s (DWORD_PTR pMD, __out_ecount (capacity_mdName) WCHAR *mdName, size_t capacity_mdName);
 BOOL NameForMT_s (DWORD_PTR MTAddr, __out_ecount (capacity_mdName) WCHAR *mdName, size_t capacity_mdName);
 
-WCHAR *CreateMethodTableName(TADDR mt, TADDR cmt = NULL);
 
 void isRetAddr(DWORD_PTR retAddr, DWORD_PTR* whereCalled);
 DWORD_PTR GetValueFromExpression (___in __in_z const char *const str);
@@ -1821,6 +1822,21 @@ struct HeapUsageStat
 };
 
 extern DacpUsefulGlobalsData g_special_usefulGlobals;
+
+class MethodTableNameUtil
+{
+private:
+    std::unordered_map<TADDR, std::wstring> m_methodTableNameCache;
+    // std::unordered_set<TADDR> m_wasMtNameSuccessful;
+
+public:
+    void Clear();
+
+    WCHAR* GetOrCreateMethodTableName(TADDR mt, TADDR cmt = NULL);
+};
+
+extern MethodTableNameUtil g_mtNameUtil;
+
 BOOL GCHeapUsageStats(const GCHeapDetails& heap, BOOL bIncUnreachable, HeapUsageStat *hpUsage);
 
 class HeapStat
@@ -2947,8 +2963,6 @@ private:
 // Methods for creating a database out of the gc heap and it's roots in xml format or CLRProfiler format
 //
 
-#include <unordered_map>
-#include <unordered_set>
 #include <list>
 
 class TypeTree;
@@ -3028,7 +3042,7 @@ private:
         const WCHAR *GetTypeName()
         {
             if (!TypeName)
-                TypeName = CreateMethodTableName(MethodTable);
+                TypeName = g_mtNameUtil.GetOrCreateMethodTableName(MethodTable);
 
             if (!TypeName)
                 return W("<error>");

@@ -143,7 +143,7 @@ namespace sos
     const WCHAR *Object::GetTypeName() const
     {
         if (mTypeName == NULL)
-            mTypeName = CreateMethodTableName(GetMT(), GetComponentMT());
+            mTypeName = g_mtNameUtil.GetOrCreateMethodTableName(GetMT(), GetComponentMT());
 
 
         if (mTypeName == NULL)
@@ -314,7 +314,7 @@ namespace sos
     const WCHAR *MethodTable::GetName() const
     {
         if (mName == NULL)
-            mName = CreateMethodTableName(mMT);
+            mName = g_mtNameUtil.GetOrCreateMethodTableName(mMT);
 
         if (mName == NULL)
             return W("<error>");

@@ -1808,49 +1808,80 @@ BOOL NameForMT_s(DWORD_PTR MTAddr, __out_ecount (capacity_mdName) WCHAR *mdName,
     return SUCCEEDED(hr);
 }
 
-WCHAR *CreateMethodTableName(TADDR mt, TADDR cmt)
+void MethodTableNameUtil::Clear()
+{
+    m_methodTableNameCache.clear();
+}
+
+WCHAR* MethodTableNameUtil::GetOrCreateMethodTableName(TADDR mt, TADDR cmt)
 {
     bool array = false;
     WCHAR *res = NULL;
-    
+
     if (mt == sos::MethodTable::GetFreeMT())
     {
         res = new WCHAR[5];
         wcscpy_s(res, 5, W("Free"));
         return res;
     }
-    
+
     if (mt == sos::MethodTable::GetArrayMT() && cmt != NULL)
     {
         mt = cmt;
         array = true;
     }
-    
-    unsigned int needed = 0;
-    HRESULT hr = g_sos->GetMethodTableName(mt, 0, NULL, &needed);
-    
-    // If failed, we will return null.
-    if (SUCCEEDED(hr))
+    // m_wasMtNameSuccessful.find;
+    auto&& iter = m_methodTableNameCache.find(mt);
+    if (iter == m_methodTableNameCache.end())
     {
-        // +2 for [], if we need it.
-        res = new WCHAR[needed+2];
-        hr = g_sos->GetMethodTableName(mt, needed, res, NULL);
-        
-        if (FAILED(hr))
+        unsigned int needed = 0;
+        std::wstring nameAsWstring = L"";
+        HRESULT hr = g_sos->GetMethodTableName(mt, 0, NULL, &needed);
+
+        // If failed, we will return null.
+        if (SUCCEEDED(hr))
         {
-            delete [] res;
-            res = NULL;
+            // +2 for [], if we need it.
+            res = new WCHAR[needed+2];
+            hr = g_sos->GetMethodTableName(mt, needed, res, NULL);
+
+            if (FAILED(hr))
+            {
+                delete [] res;
+                res = NULL;
+            }
+            {
+                nameAsWstring = std::wstring(res, res + needed - 1);
+                if (array)
+                {
+                    res[needed-1] = '[';
+                    res[needed] = ']';
+                    res[needed+1] = 0;
+                }
+            }
         }
-        else if (array)
-        {        
-            res[needed-1] = '[';
-            res[needed] = ']';
-            res[needed+1] = 0;
+        m_methodTableNameCache[mt] = nameAsWstring;
+    }
+    else
+    {
+        std::wstring cachedResult = iter->second;
+        res = new WCHAR[cachedResult.length() + 3];
+        // wcscpy_s(res, cachedResult.length() + 1, cachedResult.c_str());
+        // cachedResult.copy(res, cachedResult.length());
+        std::copy(cachedResult.begin(), cachedResult.end(), res);
+        res[cachedResult.length()] = '\0';
+        if (array)
+        {
+            res[cachedResult.length()] = '[';
+            res[cachedResult.length() + 1] = ']';
+            res[cachedResult.length() + 2] = '\0';
         }
     }
 
     return res;
 }
+
+MethodTableNameUtil g_mtNameUtil;
 
 /**********************************************************************\
 * Routine Description:                                                 *
