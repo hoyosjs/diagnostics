@@ -250,7 +250,7 @@ public class SOSRunner : IDisposable
                 }
 
                 // Create the debuggee process runner
-                ProcessRunner processRunner = new ProcessRunner(exePath, ReplaceVariables(variables, arguments.ToString())).
+                using ProcessRunner processRunner = new ProcessRunner(exePath, ReplaceVariables(variables, arguments.ToString())).
                     WithEnvironmentVariable("COMPlus_DbgEnableElfDumpOnMacOS", "1").
                     WithLog(new TestRunner.TestLogger(outputHelper.IndentedOutput)).
                     WithTimeout(TimeSpan.FromMinutes(5));
@@ -318,7 +318,7 @@ public class SOSRunner : IDisposable
                         {
                             dotnetDumpArguments.Append(" --diag");
                         }
-                        ProcessRunner dotnetDumpRunner = new ProcessRunner(config.DotNetDumpHost(), ReplaceVariables(variables, dotnetDumpArguments.ToString())).
+                        using ProcessRunner dotnetDumpRunner = new ProcessRunner(config.DotNetDumpHost(), ReplaceVariables(variables, dotnetDumpArguments.ToString())).
                             WithLog(new TestRunner.TestLogger(dotnetDumpOutputHelper)).
                             WithTimeout(TimeSpan.FromMinutes(5)).
                             WithExpectedExitCode(0);
@@ -949,7 +949,7 @@ public class SOSRunner : IDisposable
     {
         if (!_scriptLogger.HasProcessExited)
         {
-            _processRunner.Kill();
+            _processRunner.Dispose();
         }
         _outputHelper.WriteLine("}");
         _outputHelper.Dispose();

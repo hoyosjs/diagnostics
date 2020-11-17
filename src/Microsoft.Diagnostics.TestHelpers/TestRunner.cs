@@ -48,7 +48,7 @@ namespace Microsoft.Diagnostics.TestHelpers
                 }
 
                 TestLogger testLogger = new TestLogger(outputHelper.IndentedOutput);
-                ProcessRunner processRunner = new ProcessRunner(exePath, arguments).
+                using ProcessRunner processRunner = new ProcessRunner(exePath, arguments).
                     WithLog(testLogger).
                     WithTimeout(TimeSpan.FromMinutes(5));
 

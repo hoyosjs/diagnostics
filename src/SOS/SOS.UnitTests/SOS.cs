@@ -314,7 +314,7 @@ public class SOS
             arguments.AppendFormat("--assembly {0}", testDebuggee);
 
             // Create the python script process runner
-            ProcessRunner processRunner = new ProcessRunner(program, arguments.ToString()).
+            using ProcessRunner processRunner = new ProcessRunner(program, arguments.ToString()).
                 WithLog(new TestRunner.TestLogger(outputHelper.IndentedOutput)).
                 WithTimeout(TimeSpan.FromMinutes(10)).
                 WithExpectedExitCode(0).

@@ -210,7 +210,9 @@ namespace Microsoft.Diagnostics.TestHelpers
                 throw new NotSupportedException("Unknown where this OS stores the tar executable");
             }
 
-            await new ProcessRunner(tarToolPath, "-xf " + tarPath).
+            using var procRunner = new ProcessRunner(tarToolPath, "-xf " + tarPath);
+
+            await procRunner.
                    WithWorkingDirectory(expandedDirPath).
                    WithLog(output).
                    WithExpectedExitCode(0).

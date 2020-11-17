@@ -15,7 +15,7 @@ namespace Microsoft.Diagnostics.TestHelpers
     /// <summary>
     /// Executes a process and logs the output
     /// </summary>
-    /// <remarks>
+    /// <remarks>`
     /// The intended lifecycle is:
     ///   a) Create a new ProcessRunner
     ///   b) Use the various WithXXX methods to modify the configuration of the process to launch
@@ -29,7 +29,7 @@ namespace Microsoft.Diagnostics.TestHelpers
     ///   only calls to Kill() and property getters invoked within the logging callbacks will be called
     ///   asynchronously.
     /// </remarks>
-    public class ProcessRunner
+    public class ProcessRunner : IDisposable
     {
         // All of the locals might accessed from multiple threads and need to read/written under
         // the _lock. We also use the lock to synchronize property access on the process object.
@@ -47,7 +47,6 @@ namespace Microsoft.Diagnostics.TestHelpers
         int? _expectedExitCode;
         TaskCompletionSource<Process> _waitForProcessStartTaskSource;
         Task<int> _waitForExitTask;
-        Task _timeoutProcessTask;
         Task _readStdOutTask;
         Task _readStdErrTask;
         CancellationTokenSource _cancelSource;
@@ -76,27 +75,22 @@ namespace Microsoft.Diagnostics.TestHelpers
                 _killReason = null;
                 _waitForProcessStartTaskSource = new TaskCompletionSource<Process>();
                 Task<Process> startTask = _waitForProcessStartTaskSource.Task;
-                
+
                 // unfortunately we can't use the default Process stream reading because it only returns full lines and we have scenarios
                 // that need to receive the output before the newline character is written
-                _readStdOutTask = startTask.ContinueWith(t =>
+                _readStdOutTask = Task.Run(async () =>
                 {
-                    ReadStreamToLoggers(_p.StandardOutput, ProcessStream.StandardOut, _cancelSource.Token);
-                }, 
-                _cancelSource.Token, TaskContinuationOptions.LongRunning, TaskScheduler.Default);
+                    await startTask;
+                    await ReadStreamToLoggersAsync(_p.StandardOutput, ProcessStream.StandardOut, _cancelSource.Token);
+                });
 
-                _readStdErrTask = startTask.ContinueWith(t =>
+                _readStdErrTask = Task.Run(async () =>
                 {
-                    ReadStreamToLoggers(_p.StandardError, ProcessStream.StandardError, _cancelSource.Token);
-                }, 
-                _cancelSource.Token, TaskContinuationOptions.LongRunning, TaskScheduler.Default);
+                    await startTask;
+                    await ReadStreamToLoggersAsync(_p.StandardError, ProcessStream.StandardError, _cancelSource.Token);
+                });
 
-                _timeoutProcessTask = startTask.ContinueWith(t =>
-                {
-                    Task.Delay(_timeout, _cancelSource.Token).ContinueWith(t2 => Kill(KillReason.TimedOut), TaskContinuationOptions.NotOnCanceled);
-                },
-                _cancelSource.Token, TaskContinuationOptions.LongRunning, TaskScheduler.Default);
-
+                _cancelSource.Token.Register(() => Kill(KillReason.TimedOut));
                 _waitForExitTask = InternalWaitForExit(startTask, _readStdOutTask, _readStdErrTask);
                 
                 if (replayCommand == null)
@@ -271,6 +265,7 @@ namespace Microsoft.Diagnostics.TestHelpers
                 {
                     loggers = _loggers.ToArray();
                     _startTime = DateTime.Now;
+                    _cancelSource.CancelAfter(_timeout);
                     _waitForProcessStartTaskSource.SetResult(_p);
                 }
             }
@@ -287,25 +282,21 @@ namespace Microsoft.Diagnostics.TestHelpers
             return this;
         }
 
-        private void ReadStreamToLoggers(StreamReader reader, ProcessStream stream, CancellationToken cancelToken)
+        private async Task ReadStreamToLoggersAsync(StreamReader reader, ProcessStream stream, CancellationToken cancelToken)
         {
             IProcessLogger[] loggers = Loggers;
 
             // for the best efficiency we want to read in chunks, but if the underlying stream isn't
             // going to timeout partial reads then we have to fall back to reading one character at a time
-            int readChunkSize = 1;
-            if (reader.BaseStream.CanTimeout)
-            {
-                readChunkSize = 1000;
-            }
+            int readChunkSize = 1024;
 
             char[] buffer = new char[readChunkSize];
             bool lastCharWasCarriageReturn = false;
+            int charsRead = 0;
             do
             {
-                int charsRead = 0;
                 int lastStartLine = 0;
-                charsRead = reader.ReadBlock(buffer, 0, readChunkSize);
+                charsRead = await reader.ReadAsync(buffer, 0, readChunkSize);
 
                 // this lock keeps the standard out/error streams from being intermixed
                 lock (loggers)
@@ -344,7 +335,7 @@ namespace Microsoft.Diagnostics.TestHelpers
                     }
                 }
             }
-            while (!reader.EndOfStream && !cancelToken.IsCancellationRequested);
+            while (charsRead != 0 && !cancelToken.IsCancellationRequested);
         }
 
         public void Kill(KillReason reason = KillReason.Unknown)
@@ -448,6 +439,26 @@ namespace Microsoft.Diagnostics.TestHelpers
                     _traceOutput.WriteLine("TRACE: {0}", message);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            Process p = null;
+            lock (_lock)
+            {
+                if (!_p.HasExited)
+                {
+                    p = _p;
+                }
+            }
+
+            if (p is not null && !p.HasExited)
+            {
+                Kill();
+            }
+            
+            _p?.Dispose();
+            _cancelSource?.Dispose();
         }
 
         class ConsoleTestOutputHelper : ITestOutputHelper
