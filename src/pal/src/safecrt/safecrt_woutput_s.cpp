@@ -1,6 +1,5 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
-//
 
 /***
 *safecrt_woutput_s.c - implementation of the _woutput family for safercrt.lib

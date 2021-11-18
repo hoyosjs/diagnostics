@@ -1,6 +1,5 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
-//
 
 #ifndef __GCINFODUMPER_H__
 #define __GCINFODUMPER_H__

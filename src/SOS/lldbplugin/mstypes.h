@@ -1,6 +1,5 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
-//
 
 // Contains some definitions duplicated from pal.h, palrt.h, rpc.h, 
 // etc. because they have various conflicits with the linux standard

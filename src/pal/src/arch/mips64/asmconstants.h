@@ -1,6 +1,5 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
-//
 
 #ifndef __PAL_MIPS64_ASMCONSTANTS_H__
 #define __PAL_MIPS64_ASMCONSTANTS_H__
